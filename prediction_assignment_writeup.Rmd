@@ -9,10 +9,180 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Overview
+This is the final report of the Peer Assessment project from Coursera’s course Practical Machine Learning, as part of the Specialization in Data Science. This analysis is meant to be the basis for the course quiz and a prediction assignment writeup. The purpose of the project is to predict the manner in which 6 participants performed some exercise as described below. This is the “classe” variable in the training set. The best performing machine learning algorithm is applied to the 20 test cases available in the test data and the predictions are submitted in appropriate format to the Course Project Prediction Quiz for automated grading.
+
 ## Load Libraries
 ```{r,message=FALSE,warning=FALSE}
 library(tidyverse)
 library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(gbm)
 ```
+## Load Data & Clean
+
+The pml-training.csv data is used to devise training and testing sets during fitting of the model.The pml-test.csv data is used to submit 20 test cases based on the fitted model.
+
+```{r}
+train_df<-read.csv("data/pml-training.csv",na.strings=c("NA","#DIV/0!", ""))
+test_df <-read.csv("data/pml-testing.csv",na.strings=c("NA","#DIV/0!", ""))
+```
+
+Remove columns with more than 50% NA values and the index column
+
+```{r}
+var_sel<- which((colSums(!is.na(train_df))>=0.5*nrow(train_df)))
+
+#Remove the index, time stamp and username columns
+var_sel<-var_sel[-c(1:5)]
+
+train_clean_na <- train_df[,var_sel]
+test_clean_na  <- test_df [,var_sel]
+
+#Make factor variables
+train_clean_na<-mutate(train_clean_na,
+                       classe=as.factor(classe))%>%
+                select(-new_window)
+
+test_clean_na <-select(test_clean_na,-new_window)
+```
+
+## Partition data into training and test set
+Partition the training data into 60% training and 40% testing sets. There are 11776 in the training group, and 7846 in the testing group.
+
+```{r}
+in_train  <- createDataPartition(train_clean_na$classe,p = 0.6,list = FALSE)
+training  <- train_clean_na[in_train, ]
+testing   <- train_clean_na[-in_train, ]
+```
+
+## Model Selection
+
+Three model types are tested to find the best out-of-sample accuracy.
+
+* Random Forest
+* Generallized Boosted model
+* Decision Tree
+
+### Fitting a Random Forest Model
+```{r}
+#5 folds repeat 2 times
+set.seed(42)
+control <- trainControl(method='repeatedcv', 
+                        number=5, 
+                        repeats=2)
+
+rf_mod  <- train(classe ~ .,
+                 data = training,
+                 method = "rf",
+                 trControl = control,
+                 verbose = FALSE)
+```
+Predict on the test data
+
+```{r}
+pred_rf=predict(rf_mod,testing)
+cm_rf  =confusionMatrix(pred_rf,testing$classe)
+save(cm,file='confusion_matrix_rf.RData')
+cm_rf
+```
+
+```{r}
+pred_test_rf=predict(rf_mod,test_clean_na)
+save(pred_test_rf,file='pred_test_rf.RData')
+```
+
+### Fitting a Decision Tree Model
+```{r,message=FALSE,warning=FALSE}
+set.seed(42)
+dt_mod <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(dt_mod)
+```
+Predict on the test data
+
+```{r}
+pred_dt=predict(dt_mod,testing,type="class")
+cm_dt  =confusionMatrix(pred_dt,testing$classe)
+save(cm_dt,file='confusion_matrix_dt.RData')
+cm_dt
+```
+
+```{r}
+pred_test_dt=predict(dt_mod,test_clean_na,type="class")
+save(pred_test_dt,file='pred_test_dt.RData')
+```
+
+
+### Fitting a Gradient Boosted Model
+```{r}
+#5 folds repeat 2 times
+set.seed(42)
+control_gbm <- trainControl(method='repeatedcv', 
+                        number=5, 
+                        repeats=2)
+
+gbm_mod  <- train(classe ~ .,
+                  data = training,
+                  method = "gbm",
+                  trControl = control_gbm,
+                  verbose = FALSE)
+```
+Predict on the test data
+```{r}
+pred_gbm=predict(gbm_mod,testing)
+cm_gbm  =confusionMatrix(pred_gbm,testing$classe)
+save(cm_gbm,file='confusion_matrix_gbm.RData')
+cm_gbm
+```
+
+
+```{r}
+pred_test_gbm=predict(gbm_mod,test_clean_na)
+save(pred_test_gbm,file='pred_test_gbm.RData')
+```
+
+## Summarise different models
+The model that performed the best on the test data sample is the Random Forest model.
+```{r}
+data.frame(model=c("RandomForest","DecisionTree","GradientBoosted"),
+           test_accuracy=c(cm_rf$overall['Accuracy'],
+                           cm_dt$overall['Accuracy'],
+                           cm_gbm$overall['Accuracy']))
+```
+
+## Make predictions with the Random Forest Model.
+The Random Forest model is selected and applied to make predictions on the 20 data points from the original testing dataset.
+
+```{r}
+pred_test_rf
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
