@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Load Libraries
-```{r,message=FALSE}
+```{r,message=FALSE,warning=FALSE}
 library(tidyverse)
 library(caret)
 ```
